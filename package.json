@@ -3,5 +3,28 @@
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "xlsx": "^0.18.5"
-  }
+  },
+  "name": "lrh-asanaapisync",
+  "description": "A proprietary tool for the LRH research department to synchronize project data from local files",
+  "version": "1.0.0",
+  "main": "AsanaAPISync.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ICAZ117/AsanaAPISync.git"
+  },
+  "keywords": [
+    "LRH",
+    "Asana",
+    "Excel"
+  ],
+  "author": "Ibraheem Cazalas",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ICAZ117/AsanaAPISync/issues"
+  },
+  "homepage": "https://github.com/ICAZ117/AsanaAPISync#readme"
 }

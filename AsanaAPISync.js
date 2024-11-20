@@ -1,9 +1,6 @@
-require('dotenv').config();
-const { get } = require('http');
 const reader = require('xlsx');
-const file = reader.readFile('Workbook.xlsx');
 
-const doDebug = true;
+const doDebug = false;
 
 // doc: asana
 const taskConversion = {
@@ -101,13 +98,8 @@ async function getTasksInProject(project_gid, apiKey) {
     return res;
 }
 
-async function main() {
-    // Get API key from local .env file
-    const apiKey = process.env.API_KEY;
-    debug("API Key", apiKey);
-
-    // Select target sheet <- MAKE THIS USER-SELECTED LATER
-    const targetSheet = "SheetB";
+exports.asanaAPISync = async function (apiKey, file, targetSheet, startingRow = 0) {
+    // Get all sheet names from the workbook
     const sheets = file.SheetNames;
 
     // Get a list of all projects from Asana
@@ -124,7 +116,7 @@ async function main() {
             );
 
             // Iterate through each row
-            for (let j = 0; j < row.length; j++) {
+            for (let j = startingRow; j < row.length; j++) {
                 debug("Row", row[j]);
 
                 // Get project, date, and notes from the row
@@ -201,5 +193,3 @@ async function main() {
         }
     }
 }
-
-main();
