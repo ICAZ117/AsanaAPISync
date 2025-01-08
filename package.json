@@ -6,7 +6,7 @@
   },
   "name": "lrh-asanaapisync",
   "description": "A proprietary tool for the LRH research department to synchronize project data from local files",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "AsanaAPISync.js",
   "devDependencies": {},
   "scripts": {

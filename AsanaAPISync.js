@@ -1,6 +1,7 @@
 const reader = require('xlsx');
 
 const doDebug = false;
+const doTest = false;
 
 // doc: asana
 const taskConversion = {
@@ -11,11 +12,11 @@ const taskConversion = {
     "Review/Revise Package": "IRB Package Preparation Phase",
     "SAP": "IRB Package Preparation Phase",
     "DRR": "IRB Package Preparation Phase",
-    "PrepWork": "Statistical Analysis"
+    "Prep Work": "Statistical Analysis"
 }
 
-function debug(text, object) {
-    if (doDebug) {
+function debug(text, object, override = false) {
+    if (doDebug || override) {
         console.log(text || "", object || "");
     }
 }
@@ -98,55 +99,126 @@ async function getTasksInProject(project_gid, apiKey) {
     return res;
 }
 
-exports.asanaAPISync = async function (apiKey, file, targetSheet, startingRow = 0) {
+function printDetails(text) {
+    console.log(`String: "${text}"`);
+
+    // Basic details
+    console.log(`Length: ${text.length}`);
+    console.log(`Type: ${typeof text}`);
+
+    // Unicode code points
+    const unicodePoints = Array.from(text).map(char => char.codePointAt(0).toString(16).toUpperCase());
+    console.log(`Unicode Code Points (Hex): ${unicodePoints.join(' ')}`);
+
+    // Hexadecimal encoding
+    const hexEncoding = Array.from(text).map(char => char.charCodeAt(0).toString(16).toUpperCase());
+    console.log(`Hexadecimal Encoding: ${hexEncoding.join(' ')}`);
+
+    // Escape sequences
+    const escapeSequences = Array.from(text).map(char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
+    console.log(`Escape Sequences: ${escapeSequences.join(' ')}`);
+
+    // Whitespace or blank characters analysis
+    const whitespaceAnalysis = Array.from(text).map(char => {
+        if (/\s/.test(char)) return `[Whitespace: "${char}"]`;
+        return `[Char: "${char}"]`;
+    });
+    console.log(`Character Analysis: ${whitespaceAnalysis.join(' ')}`);
+
+    // Normalize forms
+    console.log(`NFC: ${text.normalize('NFC')}`);
+    console.log(`NFD: ${text.normalize('NFD')}`);
+    console.log(`NFKC: ${text.normalize('NFKC')}`);
+    console.log(`NFKD: ${text.normalize('NFKD')}`);
+
+    // Binary comparison of characters
+    console.log(`Binary Representation: ${Array.from(text).map(char => char.charCodeAt(0).toString(2).padStart(16, '0')).join(' ')}`);
+}
+
+function cleanWhitespace(text) {
+    return text ? text.replace(/\s/g, " ").trim() : text;
+}
+
+exports.asanaAPISync = async function (apiKey, file, targetSheet, startingRow = 2) {
+// async function asanaAPISync(apiKey, file, targetSheet, startingRow = 2) {
+    debug("--------------- LAUNCHING ASANA API SYNC ---------------", "", doTest);
+    debug("API Key:      ", apiKey, doTest);
+    debug("Target Sheet: ", targetSheet, doTest);
+    debug("Starting Row: ", startingRow, doTest);
+    debug("--------------------------------------------------------", "", doTest);
+
     // Get all sheet names from the workbook
     const sheets = file.SheetNames;
+    debug("\r\nSheets", sheets);
 
     // Get a list of all projects from Asana
     const projectList = await getAllProjects(apiKey);
-    console.log(projectList);
+    projectList.forEach((project) => {
+        project.name = cleanWhitespace(project.name);
+    });
+    debug("\r\nProject List", projectList);
 
+    debug("\r\nSearching for target sheet...", "", doTest);
     // Iterate through all sheets in the workbook
     for (let i = 0; i < sheets.length; i++) {
         // Check if the current sheet is the target sheet
         if (sheets[i] === targetSheet) {
-            debug("Sheet", sheets[i]);
-            const row = reader.utils.sheet_to_json(
+            debug("Sheet found: ", sheets[i], doTest);
+            const rows = reader.utils.sheet_to_json(
                 file.Sheets[file.SheetNames[i]]
             );
 
             // Iterate through each row
-            for (let j = startingRow; j < row.length; j++) {
-                debug("Row", row[j]);
+            debug("\r\nIterating through rows...", "", doTest);
+            for (let j = startingRow - 2; j < rows.length; j++) {
+                debug(`\r\n----------- Row ${j + 2} -----------`, "", doTest);
+                debug("Raw data: ", rows[j], doTest);
 
                 // Get project, date, and notes from the row
-                const project = row[j].Project;
-                const date = row[j].Date;
-                const notes = `${date} - ${row[j].Notes}`;
+                var project = rows[j].Project;
+
+                if (project) {
+                    project = cleanWhitespace(project);
+                }
+
+                var date = rows[j].Date;
+
+                // Date is currently stored as the number of days since January 1, 1900. Convert it to a date string in the form MM/dd/YYYY.
+                if (date) {
+                    const epochDate = new Date(1899, 11, 30);
+                    const dateObject = new Date(epochDate.getTime() + (date * 24 * 60 * 60 * 1000));
+                    date = `${dateObject.getMonth() + 1}/${dateObject.getDate()}/${dateObject.getFullYear()}`;
+                }
+
+                const notes = `${date} - ${rows[j].Notes}`;
 
                 // Convert the task name to the Asana task name
-                var task = row[j].Task;
+                var task = cleanWhitespace(rows[j].Task);
                 if (taskConversion[task]) {
-                    task = taskConversion[task];
+                    task = cleanWhitespace(taskConversion[task]);
                 }
                 else {
-                    console.log("Invalid task!", task);
+                    debug("Invalid task!", task, doTest);
                     continue;
                 }
 
-                debug("Project", project);
-                debug("Date", date);
-                debug("Task", task);
-                debug("Notes", notes);
-                debug("NEXT ROW\n\n");
+                debug("\r\nCleaned data: {", "", doTest);
+                debug("\tProject", project, doTest);
+                debug("\tDate", date, doTest);
+                debug("\tTask", task, doTest);
+                debug("\tNotes", notes, doTest);
+                debug("}", "", doTest);
 
                 var projectExists = false;
 
                 // Loop through projectList to find the project (if it exists)
+                debug("\r\nSearching for project...", "", doTest);
                 for (let k = 0; k < projectList.length; k++) {
-                    if (projectList[k].name === project) {
+                    // debug(`\r\nComparing ${project} to ${projectList[k].name}`, { value: projectList[k].name == project }, true);
+
+                    if (projectList[k].name == project) {
                         projectExists = true;
-                        debug("Project found", projectList[k]);
+                        debug("Project found: ", projectList[k], doTest);
 
                         // Get the project's GID
                         const project_gid = projectList[k].gid;
@@ -155,28 +227,32 @@ exports.asanaAPISync = async function (apiKey, file, targetSheet, startingRow = 
                         if (!projectList[k].tasks) {
                             projectList[k].tasks = await getTasksInProject(project_gid, apiKey);
                         }
-                        debug("Tasks", projectList[k].tasks);
+                        // debug("\r\nTasks", projectList[k].tasks, doTest);
 
                         var taskExists = false;
 
                         // Loop through the project's tasks to find the task (if it exists)
+                        debug("\r\nSearching for task...", "", doTest);
                         for (let l = 0; l < projectList[k].tasks.length; l++) {
+                            projectList[k].tasks[l].name = cleanWhitespace(projectList[k].tasks[l].name);
                             if (projectList[k].tasks[l].name === task) {
                                 taskExists = true;
-                                debug("Task found", projectList[k].tasks[l]);
+                                debug("Task found: ", projectList[k].tasks[l], doTest);
 
                                 // Get the task's GID
                                 const task_gid = projectList[k].tasks[l].gid;
 
                                 // Create a comment on the task with the notes
+                                debug("\r\nCreating comment...", "", doTest);
                                 await createComment(task_gid, notes, apiKey);
+                                debug("Comment created!", "", doTest);
                                 break;
                             }
                         }
 
                         // If the task doesn't exist, print an error message
                         if (!taskExists) {
-                            console.log("Task not found in project", task);
+                            console.log("Task not found in project", task, doTest);
                         }
 
                         break;
@@ -185,11 +261,20 @@ exports.asanaAPISync = async function (apiKey, file, targetSheet, startingRow = 
 
                 // If the project doesn't exist, print an error message
                 if (!projectExists) {
-                    console.log("Project not found", project);
+                    console.log("Project not found: ", project, doTest);
                 }
             }
 
             break;
         }
     }
+}
+
+if (doTest) {
+    console.log("Testing is enabled");
+
+    // Read in the Excel file
+    const file = reader.readFile('WorkbookEden.xlsx');
+
+    asanaAPISync("", file, "E.JAN2025", 14);
 }
